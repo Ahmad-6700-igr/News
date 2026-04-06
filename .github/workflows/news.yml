@@ -1,4 +1,4 @@
-name: Auto Tech News to Telegram
+name: Auto Tech News to Telegram with ziyad 
 
 on:
   schedule:
@@ -14,23 +14,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y curl
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y curl
 
-      - name: Fetch & Clean News
+      - name: Fetch & Format News
         run: |
           curl -s "https://hnrss.org/frontpage" | \
-          grep "<title>" | \
-          sed 's/<[^>]*>//g' | \
-          tail -n +2 | \
-          head -n 10 | \
-          nl > news.txt
+          awk -F'[<>]' '
+          /<title>/ {title=$3}
+          /<link>/ {
+            link=$3
+            if (title != "Hacker News") {
+              print "🔥 " title "\n" link "\n"
+            }
+          }' | head -n 20 > news.txt
 
-      - name: Limit message size
-        run: |
-          head -c 3500 news.txt > final.txt
+      - name: Limit size (anti error Telegram)
+        run: head -c 3500 news.txt > final.txt
 
       - name: Send to Telegram
         run: |
