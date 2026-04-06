@@ -21,14 +21,22 @@ jobs:
         run: |
           curl -s https://hnrss.org/frontpage > rss.xml
 
-      - name: Parse News (STABIL)
+      - name: Parse News (FINAL CLEAN)
         run: |
-          grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | tail -n +2 | head -n 10 > titles.txt
-          grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | tail -n +2 | head -n 10 > links.txt
+          # Ambil judul + bersihin CDATA
+          grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | \
+          tail -n +2 | head -n 10 | \
+          sed 's/<!\[CDATA\[//g; s/\]\]>//g' > titles.txt
 
-          paste titles.txt links.txt | awk '{print "🔥 "$1"\n"$2"\n"}' > news.txt
+          # Ambil link
+          grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | \
+          tail -n +2 | head -n 10 > links.txt
 
-      - name: Debug isi file
+          # Gabung tanpa merusak spasi
+          paste -d '|' titles.txt links.txt | \
+          awk -F '|' '{print "🔥 " $1 "\n" $2 "\n"}' > news.txt
+
+      - name: Debug hasil
         run: cat news.txt
 
       - name: Send to Telegram
@@ -40,5 +48,5 @@ jobs:
             -d chat_id=${{ secrets.CHAT_ID }} \
             --data-urlencode text="$TEXT"
           else
-            echo "Kosong bro, parsing gagal"
+            echo "Kosong bro"
           fi
