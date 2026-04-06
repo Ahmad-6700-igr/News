@@ -1,4 +1,4 @@
-name: Auto Tech News
+name: Auto Tech News to Telegram
 
 on:
   schedule:
@@ -10,40 +10,35 @@ on:
   workflow_dispatch:
 
 jobs:
-  send:
+  send-news:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y curl grep coreutils
+
       - name: Fetch RSS
         run: |
-          curl -s "https://hnrss.org/frontpage" > rss.xml
+          curl -s https://hnrss.org/frontpage > rss.xml
 
-      - name: Parse News
+      - name: Parse News (STABIL)
         run: |
-          awk '
-          /<item>/ {in_item=1; title=""; link=""}
-          /<\/item>/ {
-            if (title != "" && link != "") {
-              print "🔥 " title "\n" link "\n"
-            }
-            in_item=0
-          }
-          in_item && /<title>/ {
-            gsub(/.*<title>|<\/title>.*/, "", $0)
-            title=$0
-          }
-          in_item && /<link>/ {
-            gsub(/.*<link>|<\/link>.*/, "", $0)
-            link=$0
-          }
-          ' rss.xml | head -n 10 > news.txt
+          grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | tail -n +2 | head -n 10 > titles.txt
+          grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | tail -n +2 | head -n 10 > links.txt
 
-      - name: Send Telegram
+          paste titles.txt links.txt | awk '{print "🔥 "$1"\n"$2"\n"}' > news.txt
+
+      - name: Debug isi file
+        run: cat news.txt
+
+      - name: Send to Telegram
         run: |
-          if [ -s news.txt ]; then
+          TEXT=$(cat news.txt)
+
+          if [ -n "$TEXT" ]; then
             curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.CHAT_ID }}" \
-            -d "text=$(cat news.txt)"
+            -d chat_id=${{ secrets.CHAT_ID }} \
+            --data-urlencode text="$TEXT"
           else
-            echo "No news"
+            echo "Kosong bro, parsing gagal"
           fi
