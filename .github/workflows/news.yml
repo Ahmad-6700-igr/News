@@ -1,34 +1,49 @@
-- name: Fetch & Parse RSS SAFE
-  run: |
-    curl -s "https://hnrss.org/frontpage" > rss.xml
+name: Auto Tech News
 
-    awk '
-    /<item>/ {in_item=1; title=""; link=""}
-    /<\/item>/ {
-      if (title != "" && link != "") {
-        print "🔥 " title "\n" link "\n"
-      }
-      in_item=0
-    }
-    in_item && /<title>/ {
-      gsub(/.*<title>|<\/title>.*/, "", $0)
-      title=$0
-    }
-    in_item && /<link>/ {
-      gsub(/.*<link>|<\/link>.*/, "", $0)
-      link=$0
-    }
-    ' rss.xml | head -n 20 > news.txt
+on:
+  schedule:
+    - cron: '0 23 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 10 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 21 * * *'
+  workflow_dispatch:
 
-- name: Check content
-  run: cat news.txt
+jobs:
+  send:
+    runs-on: ubuntu-latest
 
-- name: Send to Telegram
-  run: |
-    if [ -s news.txt ]; then
-      curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
-      -d "chat_id=${{ secrets.CHAT_ID }}" \
-      -d "text=$(head -c 3500 news.txt)"
-    else
-      echo "No news found"
-    fi
+    steps:
+      - name: Fetch RSS
+        run: |
+          curl -s "https://hnrss.org/frontpage" > rss.xml
+
+      - name: Parse News
+        run: |
+          awk '
+          /<item>/ {in_item=1; title=""; link=""}
+          /<\/item>/ {
+            if (title != "" && link != "") {
+              print "🔥 " title "\n" link "\n"
+            }
+            in_item=0
+          }
+          in_item && /<title>/ {
+            gsub(/.*<title>|<\/title>.*/, "", $0)
+            title=$0
+          }
+          in_item && /<link>/ {
+            gsub(/.*<link>|<\/link>.*/, "", $0)
+            link=$0
+          }
+          ' rss.xml | head -n 10 > news.txt
+
+      - name: Send Telegram
+        run: |
+          if [ -s news.txt ]; then
+            curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.CHAT_ID }}" \
+            -d "text=$(cat news.txt)"
+          else
+            echo "No news"
+          fi
