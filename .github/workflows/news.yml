@@ -1,4 +1,4 @@
-name: Auto Tech News to Telegram
+name: Filtered Tech News to Telegram
 
 on:
   schedule:
@@ -21,19 +21,22 @@ jobs:
         run: |
           curl -s https://hnrss.org/frontpage > rss.xml
 
-      - name: Parse News (FINAL CLEAN)
+      - name: Parse + Filter (FINAL)
         run: |
-          # Ambil judul + bersihin CDATA
+          # Ambil judul dan bersihin CDATA
           grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | \
-          tail -n +2 | head -n 10 | \
+          tail -n +2 | \
           sed 's/<!\[CDATA\[//g; s/\]\]>//g' > titles.txt
 
           # Ambil link
           grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | \
-          tail -n +2 | head -n 10 > links.txt
+          tail -n +2 > links.txt
 
-          # Gabung tanpa merusak spasi
+          # Gabung + filter ketat
           paste -d '|' titles.txt links.txt | \
+          grep -iE "ai|artificial intelligence|machine learning|coding|developer|programming|android|software|github|python|javascript" | \
+          grep -viE "politics|war|crime|celebrity|bitcoin scam" | \
+          head -n 10 | \
           awk -F '|' '{print "🔥 " $1 "\n" $2 "\n"}' > news.txt
 
       - name: Debug hasil
@@ -48,5 +51,5 @@ jobs:
             -d chat_id=${{ secrets.CHAT_ID }} \
             --data-urlencode text="$TEXT"
           else
-            echo "Kosong bro"
+            echo "Tidak ada berita relevan hari ini"
           fi
