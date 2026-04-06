@@ -1,4 +1,4 @@
-name: Filtered Tech News to Telegram
+name: Ziyad Tech News Bot
 
 on:
   schedule:
@@ -21,9 +21,9 @@ jobs:
         run: |
           curl -s https://hnrss.org/frontpage > rss.xml
 
-      - name: Parse + Filter (FINAL)
+      - name: Parse + Filter + Format (FULL CLEAN)
         run: |
-          # Ambil judul dan bersihin CDATA
+          # Ambil judul
           grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | \
           tail -n +2 | \
           sed 's/<!\[CDATA\[//g; s/\]\]>//g' > titles.txt
@@ -32,12 +32,21 @@ jobs:
           grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | \
           tail -n +2 > links.txt
 
-          # Gabung + filter ketat
+          # Gabung + filter
           paste -d '|' titles.txt links.txt | \
           grep -iE "ai|artificial intelligence|machine learning|coding|developer|programming|android|software|github|python|javascript" | \
           grep -viE "politics|war|crime|celebrity|bitcoin scam" | \
-          head -n 10 | \
-          awk -F '|' '{print "🔥 " $1 "\n" $2 "\n"}' > news.txt
+          head -n 10 > filtered.txt
+
+          # Format akhir
+          echo "🚀 ZIYAD TECH NEWS" > news.txt
+          echo "" >> news.txt
+
+          awk -F '|' '{
+            print "🔥 " $1
+            print "👉 Insight: Teknologi ini lagi trending di dunia developer"
+            print $2 "\n"
+          }' filtered.txt >> news.txt
 
       - name: Debug hasil
         run: cat news.txt
@@ -51,5 +60,5 @@ jobs:
             -d chat_id=${{ secrets.CHAT_ID }} \
             --data-urlencode text="$TEXT"
           else
-            echo "Tidak ada berita relevan hari ini"
+            echo "Tidak ada berita relevan"
           fi
