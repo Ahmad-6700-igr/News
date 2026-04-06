@@ -1,0 +1,39 @@
+name: Auto Tech News to Telegram
+
+on:
+  schedule:
+    - cron: '0 23 * * *' # 06 WIB
+    - cron: '0 5 * * *'  # 12 WIB
+    - cron: '0 10 * * *' # 17 WIB
+    - cron: '0 14 * * *' # 21 WIB
+    - cron: '0 21 * * *' # 04 WIB
+  workflow_dispatch:
+
+jobs:
+  send-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y curl
+
+      - name: Fetch & Clean News
+        run: |
+          curl -s "https://hnrss.org/frontpage" | \
+          grep "<title>" | \
+          sed 's/<[^>]*>//g' | \
+          tail -n +2 | \
+          head -n 10 | \
+          nl > news.txt
+
+      - name: Limit message size
+        run: |
+          head -c 3500 news.txt > final.txt
+
+      - name: Send to Telegram
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
+          -d "chat_id=${{ secrets.CHAT_ID }}" \
+          -d "text=$(cat final.txt)"
