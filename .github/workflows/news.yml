@@ -1,61 +1,90 @@
-name: Smart Viral Tech News
+name: ZIYAD AI NEWS
 
 on:
   schedule:
-    - cron: '0 22 * * 0' # Minggu (Senin pagi WIB)
-    - cron: '0 22 * * 2' # Selasa (Rabu pagi WIB)
+    - cron: '0 22 * * 0'
+    - cron: '0 22 * * 2'
   workflow_dispatch:
 
 jobs:
   send-news:
     runs-on: ubuntu-latest
 
+    timeout-minutes: 5
+
+    concurrency:
+      group: ziyad-ai-news
+      cancel-in-progress: true
+
     steps:
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y curl grep coreutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl grep coreutils sed gawk
 
       - name: Fetch RSS
-        run: curl -s https://hnrss.org/frontpage > rss.xml
-
-      - name: Parse + Filter + Select BEST
         run: |
-          grep -oP '(?<=<title>).*?(?=</title>)' rss.xml | \
-          tail -n +2 | sed 's/<!\[CDATA\[//g; s/\]\]>//g' > titles.txt
+          curl -s https://hnrss.org/frontpage > rss.xml
 
-          grep -oP '(?<=<link>).*?(?=</link>)' rss.xml | \
-          tail -n +2 > links.txt
+      - name: Extract titles and links
+        run: |
+          grep -oP '(?<=<title>).*?(?=</title>)' rss.xml \
+          | tail -n +2 \
+          | sed 's/<!\[CDATA\[//g; s/\]\]>//g' > titles.txt
 
+          grep -oP '(?<=<link>).*?(?=</link>)' rss.xml \
+          | tail -n +2 > links.txt
+
+      - name: Filter AI & Developer News
+        run: |
           paste -d '|' titles.txt links.txt | \
-          grep -iE "ai|artificial intelligence|machine learning|coding|developer|programming|android|software|github|python|javascript" > filtered.txt
+          grep -iE "ai|artificial intelligence|machine learning|gpt|llm|agent|developer|coding|programming|github|python|javascript|android|software|startup|openai|deepseek|nvidia" > filtered.txt
 
-          # Ranking sederhana berdasarkan keyword kuat
+      - name: Rank Best News
+        run: |
           awk -F '|' '
           {
             score=0
-            if (tolower($1) ~ /ai|launch|release|new|agent|gpt/) score+=3
-            if (tolower($1) ~ /developer|coding|programming/) score+=2
+
+            title=tolower($1)
+
+            if (title ~ /ai|gpt|llm|agent|openai|deepseek|nvidia/) score+=4
+            if (title ~ /launch|release|new|future|breaking/) score+=3
+            if (title ~ /developer|coding|programming|github/) score+=2
             if (length($1) > 60) score+=1
+
             print score "|" $0
           }' filtered.txt | sort -t'|' -nr | head -n 1 > best.txt
 
-      - name: Format Output (WITH SUMMARY)
+      - name: Create News Message
         run: |
           TITLE=$(cut -d '|' -f2 best.txt)
           LINK=$(cut -d '|' -f3 best.txt)
 
-          echo "🚀 ZIYAD TECH INSIGHT" > news.txt
+          NEWS_ID="NEWS-$(date +%Y%m%d%H%M)"
+
+          echo "🚀 ZIYAD AI INSIGHT" > news.txt
+          echo "" >> news.txt
+
+          echo "🆔 $NEWS_ID" >> news.txt
           echo "" >> news.txt
 
           echo "🔥 $TITLE" >> news.txt
           echo "" >> news.txt
 
           echo "🧠 Ringkasan:" >> news.txt
-          echo "Teknologi ini lagi ramai dibahas karena punya potensi besar di dunia AI dan developer. Bisa berdampak ke cara orang coding dan membangun produk." >> news.txt
+          echo "Berita ini sedang ramai di dunia teknologi karena berpotensi memengaruhi perkembangan AI, software, developer, dan industri digital modern." >> news.txt
+          echo "" >> news.txt
+
+          echo "💬 Reply pesan ini untuk bertanya ke AI tentang berita ini." >> news.txt
+          echo "" >> news.txt
+
+          echo "📰 Source: Hacker News" >> news.txt
           echo "" >> news.txt
 
           echo "🔗 $LINK" >> news.txt
 
-      - name: Debug
+      - name: Debug Output
         run: cat news.txt
 
       - name: Send to Telegram
@@ -63,9 +92,9 @@ jobs:
           TEXT=$(cat news.txt)
 
           if [ -n "$TEXT" ]; then
-            curl -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
             -d chat_id=${{ secrets.CHAT_ID }} \
             --data-urlencode text="$TEXT"
           else
-            echo "Tidak ada berita"
+            echo "No news found"
           fi
