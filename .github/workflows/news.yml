@@ -137,7 +137,8 @@ jobs:
 
           NEWS_ID="AI-$(date +%Y%m%d)"
 
-          echo "🚀 ZIYAD AI NEWS
+          cat > ai_message.txt <<EOF
+🚀 ZIYAD AI NEWS
 
 🆔 $NEWS_ID
 
@@ -149,13 +150,14 @@ jobs:
 
 🔗 $AI_LINK
 
-💬 Reply pesan ini untuk bertanya ke AI tentang berita ini." > ai_message.txt
+💬 Reply pesan ini untuk bertanya ke AI tentang berita ini.
+EOF
 
           TEXT=$(cat ai_message.txt)
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
-          -d chat_id=${{ secrets.CHAT_ID }} \
-          --data-urlencode text="$TEXT"
+            -d chat_id=${{ secrets.CHAT_ID }} \
+            --data-urlencode text="$TEXT"
 
       ###################################################
       # SEND GITHUB TRENDING
@@ -165,19 +167,21 @@ jobs:
         run: |
           REPO=$(cat repo.txt)
 
-          echo "💻 ZIYAD GITHUB TRENDING
+          cat > repo_message.txt <<EOF
+💻 ZIYAD GITHUB TRENDING
 
 ⭐ https://github.com$REPO
 
 🛠 Repository ini sedang menarik perhatian komunitas developer dan AI.
 
-💬 Reply pesan ini untuk bertanya ke AI tentang repository ini." > repo_message.txt
+💬 Reply pesan ini untuk bertanya ke AI tentang repository ini.
+EOF
 
           TEXT=$(cat repo_message.txt)
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
-          -d chat_id=${{ secrets.CHAT_ID }} \
-          --data-urlencode text="$TEXT"
+            -d chat_id=${{ secrets.CHAT_ID }} \
+            --data-urlencode text="$TEXT"
 
       ###################################################
       # SEND FREE AI COURSE
@@ -187,16 +191,18 @@ jobs:
         run: |
           COURSE=$(cat course.txt)
 
-          echo "🎓 FREE AI COURSE
+          cat > course_message.txt <<EOF
+🎓 FREE AI COURSE
 
 📚 $COURSE
 
 🚀 Belajar AI langsung dari platform terpercaya secara gratis.
 
-💬 Reply pesan ini untuk bertanya ke AI tentang course ini." > course_message.txt
+💬 Reply pesan ini untuk bertanya ke AI tentang course ini.
+EOF
 
           TEXT=$(cat course_message.txt)
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
-          -d chat_id=${{ secrets.CHAT_ID }} \
-          --data-urlencode text="$TEXT"
+            -d chat_id=${{ secrets.CHAT_ID }} \
+            --data-urlencode text="$TEXT"
