@@ -2,7 +2,7 @@ name: ZIYAD AI DAILY INTEL
 
 on:
   schedule:
-    # Jam 07:00 WIB setiap hari
+    # 07:00 WIB setiap hari
     - cron: '0 0 * * *'
   workflow_dispatch:
 
@@ -17,6 +17,7 @@ jobs:
       cancel-in-progress: true
 
     steps:
+
       ###################################################
       # INSTALL TOOLS
       ###################################################
@@ -50,7 +51,7 @@ jobs:
           paste -d '|' ai_titles.txt ai_links.txt > ai_combined.txt
 
       ###################################################
-      # FILTER HYPE AI NEWS
+      # FILTER AI NEWS
       ###################################################
 
       - name: Filter AI News
@@ -59,37 +60,31 @@ jobs:
           grep -ivE "job|jobs|career|hiring|vacancy|sponsor|internship|remote" > ai_filtered.txt || true
 
       ###################################################
+      # FALLBACK IF EMPTY
+      ###################################################
+
+      - name: Fallback AI News
+        run: |
+          if [ ! -s ai_filtered.txt ]; then
+            cp ai_combined.txt ai_filtered.txt
+          fi
+
+      ###################################################
       # RANK BEST NEWS
       ###################################################
 
       - name: Rank Best AI News
         run: |
-          if [ ! -s ai_filtered.txt ]; then
-            echo "No filtered news found"
-            cp ai_combined.txt ai_filtered.txt
-          fi
-
           awk -F '|' '
           {
             score=0
             title=tolower($1)
 
-            # Big AI companies
             if (title ~ /openai|google|anthropic|nvidia|deepseek|meta|microsoft/) score+=6
-
-            # AI keywords
             if (title ~ /gpt|gemini|claude|llm|agent|ai/) score+=5
-
-            # Hype keywords
             if (title ~ /launch|release|released|new|future|breaking|update/) score+=4
-
-            # Dev keywords
             if (title ~ /developer|coding|programming|github|python|javascript/) score+=2
-
-            # Long title bonus
             if (length($1) > 55) score+=1
-
-            # Anti jobs
             if (title ~ /job|jobs|career|hiring|vacancy/) score-=10
 
             print score "|" $0
@@ -114,7 +109,7 @@ jobs:
           head -n 1 > repo.txt || true
 
       ###################################################
-      # FALLBACK REPOSITORY
+      # REPOSITORY FALLBACK
       ###################################################
 
       - name: Repository fallback
@@ -132,81 +127,75 @@ jobs:
           echo "https://www.deeplearning.ai/short-courses/" > course.txt
 
       ###################################################
-      # CREATE TELEGRAM MESSAGE
+      # SEND AI NEWS
       ###################################################
 
-      - name: Create Telegram Message
+      - name: Send AI News
         run: |
-          AI_TITLE=$(cut -d '|' -f1 best_ai.txt)
+          AI_TITLE=$(cut -d '|' -f2 best_ai.txt)
           AI_LINK=$(cut -d '|' -f3 best_ai.txt)
-
-          REPO=$(cat repo.txt)
-          COURSE=$(cat course.txt)
 
           NEWS_ID="AI-$(date +%Y%m%d)"
 
-          echo "🚀 ZIYAD AI DAILY INTEL" > news.txt
-          echo "" >> news.txt
+          echo "🚀 ZIYAD AI NEWS
 
-          echo "🆔 $NEWS_ID" >> news.txt
-          echo "" >> news.txt
+🆔 $NEWS_ID
 
-          ###################################################
-          # AI NEWS
-          ###################################################
+🌍 AI HYPE NEWS
 
-          echo "🌍 AI HYPE NEWS" >> news.txt
-          echo "" >> news.txt
+🔥 $AI_TITLE
 
-          echo "🔥 $AI_TITLE" >> news.txt
-          echo "" >> news.txt
+🧠 Berita ini sedang ramai dibahas secara global dan berpotensi memengaruhi dunia AI, software, automation, dan developer modern.
 
-          echo "🧠 Berita ini sedang ramai dibahas secara global dan berpotensi memengaruhi dunia AI, software, automation, dan developer modern." >> news.txt
-          echo "" >> news.txt
+🔗 $AI_LINK
 
-          echo "🔗 $AI_LINK" >> news.txt
-          echo "" >> news.txt
+💬 Reply pesan ini untuk bertanya ke AI tentang berita ini." > ai_message.txt
 
-          ###################################################
-          # GITHUB TRENDING
-          ###################################################
+          TEXT=$(cat ai_message.txt)
 
-          echo "💻 GITHUB TRENDING" >> news.txt
-          echo "" >> news.txt
-
-          echo "⭐ https://github.com$REPO" >> news.txt
-          echo "" >> news.txt
-
-          echo "🛠 Repository ini sedang menarik perhatian komunitas developer dan AI." >> news.txt
-          echo "" >> news.txt
-
-          ###################################################
-          # FREE AI COURSE
-          ###################################################
-
-          echo "🎓 FREE AI COURSE" >> news.txt
-          echo "" >> news.txt
-
-          echo "📚 $COURSE" >> news.txt
-          echo "" >> news.txt
-
-          echo "💬 Reply pesan ini untuk bertanya ke AI tentang berita hari ini." >> news.txt
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
+          -d chat_id=${{ secrets.CHAT_ID }} \
+          --data-urlencode text="$TEXT"
 
       ###################################################
-      # DEBUG
+      # SEND GITHUB TRENDING
       ###################################################
 
-      - name: Debug Output
+      - name: Send GitHub Trending
         run: |
-          cat news.txt
+          REPO=$(cat repo.txt)
+
+          echo "💻 ZIYAD GITHUB TRENDING
+
+⭐ https://github.com$REPO
+
+🛠 Repository ini sedang menarik perhatian komunitas developer dan AI.
+
+💬 Reply pesan ini untuk bertanya ke AI tentang repository ini." > repo_message.txt
+
+          TEXT=$(cat repo_message.txt)
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
+          -d chat_id=${{ secrets.CHAT_ID }} \
+          --data-urlencode text="$TEXT"
 
       ###################################################
-      # SEND TELEGRAM
+      # SEND FREE AI COURSE
       ###################################################
 
-      - name: Send to Telegram
+      - name: Send Free AI Course
         run: |
-          TEXT=$(cat news.txt)
+          COURSE=$(cat course.txt)
+
+          echo "🎓 FREE AI COURSE
+
+📚 $COURSE
+
+🚀 Belajar AI langsung dari platform terpercaya secara gratis.
+
+💬 Reply pesan ini untuk bertanya ke AI tentang course ini." > course_message.txt
+
+          TEXT=$(cat course_message.txt)
 
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage" \
           -d chat_id=${{ secrets.CHAT_ID }} \
