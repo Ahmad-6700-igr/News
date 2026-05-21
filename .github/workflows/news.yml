@@ -17,20 +17,28 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      ###################################################
+      # INSTALL TOOLS
+      ###################################################
+
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y curl grep sed gawk coreutils
 
       ###################################################
-      # AI HYPE NEWS
+      # FETCH HACKER NEWS RSS
       ###################################################
 
-      - name: Fetch AI News RSS
+      - name: Fetch Hacker News RSS
         run: |
-          curl -s "https://news.google.com/rss/search?q=artificial+intelligence" > ai.xml
+          curl -s "https://hnrss.org/frontpage" > ai.xml
 
-      - name: Extract AI News
+      ###################################################
+      # EXTRACT TITLES + LINKS
+      ###################################################
+
+      - name: Extract titles and links
         run: |
           grep -oP '(?<=<title>).*?(?=</title>)' ai.xml \
           | tail -n +2 \
@@ -41,42 +49,82 @@ jobs:
 
           paste -d '|' ai_titles.txt ai_links.txt > ai_combined.txt
 
-      - name: Filter Hype AI News
+      ###################################################
+      # FILTER HYPE AI NEWS
+      ###################################################
+
+      - name: Filter AI News
         run: |
-          grep -iE "openai|google|gemini|anthropic|claude|deepseek|nvidia|meta|microsoft|ai|gpt|llm|agent|automation|robotics" ai_combined.txt | \
-          grep -ivE "job|jobs|career|hiring|vacancy|sponsor" > ai_filtered.txt
+          grep -iE "openai|google|gemini|anthropic|claude|deepseek|nvidia|meta|microsoft|ai|gpt|llm|agent|automation|robotics|developer|coding|programming|github|python|javascript" ai_combined.txt | \
+          grep -ivE "job|jobs|career|hiring|vacancy|sponsor|internship|remote" > ai_filtered.txt || true
+
+      ###################################################
+      # RANK BEST NEWS
+      ###################################################
 
       - name: Rank Best AI News
         run: |
+          if [ ! -s ai_filtered.txt ]; then
+            echo "No filtered news found"
+            cp ai_combined.txt ai_filtered.txt
+          fi
+
           awk -F '|' '
           {
             score=0
             title=tolower($1)
 
+            # Big AI companies
             if (title ~ /openai|google|anthropic|nvidia|deepseek|meta|microsoft/) score+=6
-            if (title ~ /gpt|gemini|claude|llm|agent/) score+=5
-            if (title ~ /launch|release|breaking|future|new|update/) score+=4
+
+            # AI keywords
+            if (title ~ /gpt|gemini|claude|llm|agent|ai/) score+=5
+
+            # Hype keywords
+            if (title ~ /launch|release|released|new|future|breaking|update/) score+=4
+
+            # Dev keywords
+            if (title ~ /developer|coding|programming|github|python|javascript/) score+=2
+
+            # Long title bonus
             if (length($1) > 55) score+=1
+
+            # Anti jobs
+            if (title ~ /job|jobs|career|hiring|vacancy/) score-=10
 
             print score "|" $0
           }' ai_filtered.txt | sort -t'|' -nr | head -n 1 > best_ai.txt
 
       ###################################################
-      # GITHUB TRENDING
+      # FETCH GITHUB TRENDING
       ###################################################
 
       - name: Fetch GitHub Trending
         run: |
           curl -s https://github.com/trending > trending.html
 
+      ###################################################
+      # EXTRACT REPOSITORY
+      ###################################################
+
       - name: Extract Trending Repository
         run: |
           grep -oP '/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+' trending.html | \
           grep -iE "ai|agent|gpt|llm|bot|automation|python|javascript" | \
-          head -n 1 > repo.txt
+          head -n 1 > repo.txt || true
 
       ###################################################
-      # AI COURSE
+      # FALLBACK REPOSITORY
+      ###################################################
+
+      - name: Repository fallback
+        run: |
+          if [ ! -s repo.txt ]; then
+            echo "/microsoft/markitdown" > repo.txt
+          fi
+
+      ###################################################
+      # FREE AI COURSE
       ###################################################
 
       - name: Create AI Course
@@ -84,16 +132,15 @@ jobs:
           echo "https://www.deeplearning.ai/short-courses/" > course.txt
 
       ###################################################
-      # FORMAT MESSAGE
+      # CREATE TELEGRAM MESSAGE
       ###################################################
 
       - name: Create Telegram Message
         run: |
-          AI_TITLE=$(cut -d '|' -f2 best_ai.txt)
+          AI_TITLE=$(cut -d '|' -f1 best_ai.txt)
           AI_LINK=$(cut -d '|' -f3 best_ai.txt)
 
           REPO=$(cat repo.txt)
-
           COURSE=$(cat course.txt)
 
           NEWS_ID="AI-$(date +%Y%m%d)"
@@ -114,14 +161,14 @@ jobs:
           echo "🔥 $AI_TITLE" >> news.txt
           echo "" >> news.txt
 
-          echo "🧠 Berita ini sedang ramai secara global dan punya potensi besar memengaruhi dunia AI, software, automation, dan developer." >> news.txt
+          echo "🧠 Berita ini sedang ramai dibahas secara global dan berpotensi memengaruhi dunia AI, software, automation, dan developer modern." >> news.txt
           echo "" >> news.txt
 
           echo "🔗 $AI_LINK" >> news.txt
           echo "" >> news.txt
 
           ###################################################
-          # GITHUB REPO
+          # GITHUB TRENDING
           ###################################################
 
           echo "💻 GITHUB TRENDING" >> news.txt
@@ -130,11 +177,11 @@ jobs:
           echo "⭐ https://github.com$REPO" >> news.txt
           echo "" >> news.txt
 
-          echo "🛠 Repository ini sedang menarik perhatian developer dan komunitas AI." >> news.txt
+          echo "🛠 Repository ini sedang menarik perhatian komunitas developer dan AI." >> news.txt
           echo "" >> news.txt
 
           ###################################################
-          # FREE COURSE
+          # FREE AI COURSE
           ###################################################
 
           echo "🎓 FREE AI COURSE" >> news.txt
